@@ -64,9 +64,10 @@ pub trait TagQueryEncoder {
         enc_name: Self::Arg,
         enc_value: Self::Arg,
         is_plaintext: bool,
+        clause_id: int,
     ) -> Result<Option<Self::Clause>, Error>;
 
-    fn encode_in_clause(
+    fn encode_and_clause(
         &mut self,
         enc_name: Self::Arg,
         enc_values: Vec<Self::Arg>,
@@ -160,31 +161,31 @@ impl ConjunctionOp {
     }
 }
 
-fn encode_tag_query<V, E>(query: &TagQuery, enc: &mut E, negate: bool) -> Result<Option<V>, Error>
+fn encode_tag_query<V, E>(query: &TagQuery, enc: &mut E, negate: bool, clause_id: &str) -> Result<Option<V>, Error>
 where
     E: TagQueryEncoder<Clause = V>,
 {
     match query {
         TagQuery::Eq(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Eq, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Eq, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::Neq(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Neq, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Neq, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::Gt(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Gt, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Gt, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::Gte(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Gte, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Gte, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::Lt(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Lt, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Lt, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::Lte(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Lte, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Lte, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::Like(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Like, tag_name, target_value, enc, negate)
+            encode_tag_op(CompareOp::Like, tag_name, target_value, enc, negate, clause_id + "_1")
         }
         TagQuery::In(tag_name, target_values) => {
             encode_tag_in(tag_name, target_values, enc, negate)
@@ -192,7 +193,7 @@ where
         TagQuery::Exist(tag_names) => encode_tag_exist(tag_names, enc, negate),
         TagQuery::And(subqueries) => encode_tag_conj(ConjunctionOp::And, subqueries, enc, negate),
         TagQuery::Or(subqueries) => encode_tag_conj(ConjunctionOp::Or, subqueries, enc, negate),
-        TagQuery::Not(subquery) => encode_tag_query(subquery, enc, !negate),
+        TagQuery::Not(subquery) => encode_tag_query(subquery, enc, !negate, clause_id + "_1"),
     }
 }
 
@@ -202,6 +203,7 @@ fn encode_tag_op<V, E>(
     value: &String,
     enc: &mut E,
     negate: bool,
+    clause_id: &String,
 ) -> Result<Option<V>, Error>
 where
     E: TagQueryEncoder<Clause = V>,
@@ -214,7 +216,7 @@ where
     let enc_value = enc.encode_value(value, is_plaintext)?;
     let op = if negate { op.negate() } else { op };
 
-    enc.encode_op_clause(op, enc_name, enc_value, is_plaintext)
+    enc.encode_op_clause(op, enc_name, enc_value, is_plaintext, clause_id)
 }
 
 fn encode_tag_in<V, E>(
@@ -236,7 +238,7 @@ where
         .map(|val| enc.encode_value(val, is_plaintext))
         .collect::<Result<Vec<_>, Error>>()?;
 
-    enc.encode_in_clause(enc_name, enc_values, is_plaintext, negate)
+    enc.encode_and_clause(enc_name, enc_values, is_plaintext, negate)
 }
 
 fn encode_tag_exist<V, E>(names: &[TagName], enc: &mut E, negate: bool) -> Result<Option<V>, Error>
@@ -309,8 +311,9 @@ mod tests {
             name: Self::Arg,
             value: Self::Arg,
             _is_plaintext: bool,
+            clause_id: int,
         ) -> Result<Option<Self::Clause>, Error> {
-            Ok(Some(format!("{} {} {}", name, op.as_sql_str(), value)))
+            Ok(Some(format!("{} {} {}", name, op.as_sql_str(), value, 1)))
         }
 
         fn encode_exist_clause(
@@ -323,14 +326,14 @@ mod tests {
             Ok(Some(format!("{}({})", op, name)))
         }
 
-        fn encode_in_clause(
+        fn encode_and_clause(
             &mut self,
             name: Self::Arg,
             values: Vec<Self::Arg>,
             _is_plaintext: bool,
             negate: bool,
         ) -> Result<Option<Self::Clause>, Error> {
-            let op = if negate { "NOT IN" } else { "IN" };
+            let op = if negate { "AND NOT" } else { "AND" };
             let value =
                 Itertools::intersperse(values.iter().map(|v| v.as_str()), ", ").collect::<String>();
             Ok(Some(format!("{} {} ({})", name, op, value)))

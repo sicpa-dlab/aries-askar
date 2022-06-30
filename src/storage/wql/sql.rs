@@ -55,6 +55,7 @@ where
         enc_name: Self::Arg,
         enc_value: Self::Arg,
         is_plaintext: bool,
+        clause_id: int,
     ) -> Result<Option<Self::Clause>, Error> {
         let idx = self.arguments.len();
         let (op_prefix, match_prefix) = match (is_plaintext, op.as_sql_str_for_prefix()) {
@@ -64,7 +65,7 @@ where
                 // on its own
                 let match_prefix = enc_value[..12].to_vec();
                 (
-                    format!(" AND SUBSTR(value, 1, 12) {} ${}", pfx_op, idx + 3),
+                    format!(" AND SUBSTR(items_tags{}.value, 1, 12) {} ${}", clause_id, pfx_op, idx + 3),
                     Some(match_prefix),
                 )
             }
@@ -77,34 +78,23 @@ where
         }
 
         let query = format!(
-            "i.id IN (SELECT item_id FROM items_tags WHERE name = ${} AND value {} ${}{} AND plaintext = {})",
+            "(items_tags{}.name = ${} AND items_tags{}.value {} ${}{} AND items_tags{}.plaintext = {})",
+            clause_id,
             idx + 1,
+            clause_id,
             op.as_sql_str(),
             idx + 2,
             op_prefix.as_str(),
+            clause_id,
             if is_plaintext { 1 } else { 0 }
         );
-        Ok(Some(query))
-    }
 
-    fn encode_in_clause(
-        &mut self,
-        enc_name: Self::Arg,
-        enc_values: Vec<Self::Arg>,
-        is_plaintext: bool,
-        negate: bool,
-    ) -> Result<Option<Self::Clause>, Error> {
-        let args_in = Itertools::intersperse(std::iter::repeat("$$").take(enc_values.len()), ", ")
-            .collect::<String>();
-        let query = format!(
-            "i.id IN (SELECT item_id FROM items_tags WHERE name = $$ AND value {} ({}) AND plaintext = {})",
-            if negate { "NOT IN" } else { "IN" },
-            args_in,
-            if is_plaintext { 1 } else { 0 }
+        let join = format!(
+            "LEFT JOIN items_tags it{} on it{}.item_id = i.id",
+            clause_id,
         );
-        self.arguments.push(enc_name);
-        self.arguments.extend(enc_values);
-        Ok(Some(query))
+
+        Ok(Some(join, query))
     }
 
     fn encode_exist_clause(

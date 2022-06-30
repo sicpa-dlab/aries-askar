@@ -584,7 +584,10 @@ pub fn prepare_tags(tags: &[EntryTag]) -> Result<Vec<EntryTag>, Error> {
 
 pub fn extend_query<'q, Q: QueryPrepare>(
     query: &str,
+    query_where: &str,
+    query_group_by: &str,
     args: &mut QueryParams<'q, Q::DB>,
+    tag_joins: &str,
     tag_filter: Option<(String, Vec<Vec<u8>>)>,
     offset: Option<i64>,
     limit: Option<i64>,
@@ -594,11 +597,24 @@ where
     Vec<u8>: for<'e> Encode<'e, Q::DB> + Type<Q::DB>,
 {
     let mut query = query.to_string();
+    if tag_joins.is_some() {
+        query.push_str(tag_joins);
+    };
+    
+    if query_where.is_some() {
+        query = query.push_str(query_where);
+    };
+
     if let Some((filter_clause, filter_args)) = tag_filter {
         args.extend(filter_args);
         query.push_str(" AND "); // assumes WHERE already occurs
         query.push_str(&filter_clause);
     };
+
+    if query_group_by.is_some() {
+        query = query.push_str(query_group_by);
+    }
+
     if offset.is_some() || limit.is_some() {
         query = Q::limit_query(query, args, offset, limit);
     };
