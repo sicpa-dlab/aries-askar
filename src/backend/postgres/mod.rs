@@ -31,9 +31,10 @@ use crate::{
     storage::{EncEntryTag, Entry, EntryKind, EntryOperation, EntryTag, Scan, TagFilter},
 };
 
-const COUNT_QUERY: &'static str = "SELECT COUNT(*) FROM items i
-    WHERE profile_id = $1 AND kind = $2 AND category = $3
-    AND (expiry IS NULL OR expiry > CURRENT_TIMESTAMP)";
+const COUNT_QUERY: &'static str = "SELECT COUNT(*) FROM items i";
+const COUNT_QUERY_WHERE: &'static str = "WHERE i.profile_id = $1 AND i.kind = $2 AND i.category = $3
+    AND (i.expiry IS NULL OR i.expiry > CURRENT_TIMESTAMP)";
+const COUNT_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
 const DELETE_QUERY: &'static str = "DELETE FROM items
     WHERE profile_id = $1 AND kind = $2 AND category = $3 AND name = $4";
 const FETCH_QUERY: &'static str = "SELECT id, value,
@@ -57,12 +58,14 @@ const INSERT_QUERY: &'static str =
 const UPDATE_QUERY: &'static str = "UPDATE items SET value=$5, expiry=$6
     WHERE profile_id=$1 AND kind=$2 AND category=$3 AND name=$4
     RETURNING id";
-const SCAN_QUERY: &'static str = "SELECT id, name, value,
+const SCAN_QUERY: &'static str = "SELECT i.id, i.name, i.value,
     (SELECT ARRAY_TO_STRING(ARRAY_AGG(it.plaintext || ':'
         || ENCODE(it.name, 'hex') || ':' || ENCODE(it.value, 'hex')), ',')
         FROM items_tags it WHERE it.item_id = i.id) tags
-    FROM items i WHERE profile_id = $1 AND kind = $2 AND category = $3
-    AND (expiry IS NULL OR expiry > CURRENT_TIMESTAMP)";
+    FROM items i";
+const SCAN_QUERY_WHERE: &'static str = "WHERE i.profile_id = $1 AND i.kind = $2 AND i.category = $3
+    AND (i.expiry IS NULL OR i.expiry > CURRENT_TIMESTAMP)";
+const SCAN_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
 const DELETE_ALL_QUERY: &'static str = "DELETE FROM items i
     WHERE i.profile_id = $1 AND i.kind = $2 AND i.category = $3";
 const TAG_INSERT_QUERY: &'static str = "INSERT INTO items_tags
@@ -290,7 +293,15 @@ impl QueryBackend for DbSession<Postgres> {
             .await?;
             params.push(enc_category);
             let query =
-                extend_query::<PostgresStore>(COUNT_QUERY, &mut params, tag_filter, None, None)?;
+                extend_query::<PostgresStore>(
+                    COUNT_QUERY,
+                    COUNT_QUERY_WHERE,
+                    COUNT_QUERY_GROUP_BY,
+                    &mut params,
+                    tag_filter,
+                    None,
+                    None
+                )?;
             let mut active = acquire_session(&mut *self).await?;
             let count = sqlx::query_scalar_with(query.as_str(), params)
                 .fetch_one(active.connection_mut())
@@ -421,6 +432,8 @@ impl QueryBackend for DbSession<Postgres> {
             params.push(enc_category);
             let query = extend_query::<PostgresStore>(
                 DELETE_ALL_QUERY,
+                "",
+                "",
                 &mut params,
                 tag_filter,
                 None,
@@ -678,7 +691,7 @@ fn perform_scan<'q>(
             }
         }).await?;
         params.push(enc_category);
-        let mut query = extend_query::<PostgresStore>(SCAN_QUERY, &mut params, tag_filter, offset, limit)?;
+        let mut query = extend_query::<PostgresStore>(SCAN_QUERY, SCAN_QUERY_WHERE, SCAN_QUERY_GROUP_BY, &mut params, tag_filter, offset, limit)?;
         if for_update {
             query.push_str(" FOR NO KEY UPDATE");
         }

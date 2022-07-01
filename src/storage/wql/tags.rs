@@ -46,12 +46,13 @@ impl Into<String> for &TagName {
 pub trait TagQueryEncoder {
     type Arg;
     type Clause;
+    type JoinClause;
 
-    fn encode_query(&mut self, query: &TagQuery) -> Result<Option<Self::Clause>, Error>
+    fn encode_query(&mut self, query: &TagQuery) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error>
     where
         Self: Sized,
     {
-        encode_tag_query(query, self, false)
+        encode_tag_query(query, self, false, &"it2".to_string())
     }
 
     fn encode_name(&mut self, name: &TagName) -> Result<Self::Arg, Error>;
@@ -64,8 +65,8 @@ pub trait TagQueryEncoder {
         enc_name: Self::Arg,
         enc_value: Self::Arg,
         is_plaintext: bool,
-        clause_id: int,
-    ) -> Result<Option<Self::Clause>, Error>;
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error>;
 
     fn encode_and_clause(
         &mut self,
@@ -73,20 +74,23 @@ pub trait TagQueryEncoder {
         enc_values: Vec<Self::Arg>,
         is_plaintext: bool,
         negate: bool,
-    ) -> Result<Option<Self::Clause>, Error>;
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error>;
 
     fn encode_exist_clause(
         &mut self,
         enc_name: Self::Arg,
         is_plaintext: bool,
         negate: bool,
-    ) -> Result<Option<Self::Clause>, Error>;
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error>;
 
     fn encode_conj_clause(
         &mut self,
         op: ConjunctionOp,
         clauses: Vec<Self::Clause>,
-    ) -> Result<Option<Self::Clause>, Error>;
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,52 +165,54 @@ impl ConjunctionOp {
     }
 }
 
-fn encode_tag_query<V, E>(query: &TagQuery, enc: &mut E, negate: bool, clause_id: &str) -> Result<Option<V>, Error>
+fn encode_tag_query<V, JC, E>(query: &TagQuery, enc: &mut E, negate: bool, clause_id: &str) -> Result<Option<(V, JC)>, Error>
 where
-    E: TagQueryEncoder<Clause = V>,
+    E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
+    let mut new_clause_id: String = clause_id.to_owned();
+    new_clause_id.push_str("_1");
     match query {
         TagQuery::Eq(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Eq, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Eq, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::Neq(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Neq, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Neq, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::Gt(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Gt, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Gt, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::Gte(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Gte, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Gte, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::Lt(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Lt, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Lt, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::Lte(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Lte, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Lte, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::Like(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Like, tag_name, target_value, enc, negate, clause_id + "_1")
+            encode_tag_op(CompareOp::Like, tag_name, target_value, enc, negate, &new_clause_id)
         }
         TagQuery::In(tag_name, target_values) => {
-            encode_tag_in(tag_name, target_values, enc, negate)
+            encode_tag_in(tag_name, target_values, enc, negate, &new_clause_id)
         }
-        TagQuery::Exist(tag_names) => encode_tag_exist(tag_names, enc, negate),
-        TagQuery::And(subqueries) => encode_tag_conj(ConjunctionOp::And, subqueries, enc, negate),
-        TagQuery::Or(subqueries) => encode_tag_conj(ConjunctionOp::Or, subqueries, enc, negate),
-        TagQuery::Not(subquery) => encode_tag_query(subquery, enc, !negate, clause_id + "_1"),
+        TagQuery::Exist(tag_names) => encode_tag_exist(tag_names, enc, negate, &new_clause_id),
+        TagQuery::And(subqueries) => encode_tag_conj(ConjunctionOp::And, subqueries, enc, negate, &new_clause_id),
+        TagQuery::Or(subqueries) => encode_tag_conj(ConjunctionOp::Or, subqueries, enc, negate, &new_clause_id),
+        TagQuery::Not(subquery) => encode_tag_query(subquery, enc, !negate, &new_clause_id),
     }
 }
 
-fn encode_tag_op<V, E>(
+fn encode_tag_op<V, JC, E>(
     op: CompareOp,
     name: &TagName,
     value: &String,
     enc: &mut E,
     negate: bool,
     clause_id: &String,
-) -> Result<Option<V>, Error>
+) -> Result<Option<(V, JC)>, Error>
 where
-    E: TagQueryEncoder<Clause = V>,
+    E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
     let is_plaintext = match &name {
         TagName::Plaintext(_) => true,
@@ -219,14 +225,15 @@ where
     enc.encode_op_clause(op, enc_name, enc_value, is_plaintext, clause_id)
 }
 
-fn encode_tag_in<V, E>(
+fn encode_tag_in<V, JC, E>(
     name: &TagName,
     values: &Vec<String>,
     enc: &mut E,
     negate: bool,
-) -> Result<Option<V>, Error>
+    clause_id: &str
+) -> Result<Option<(V, JC)>, Error>
 where
-    E: TagQueryEncoder<Clause = V>,
+    E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
     let is_plaintext = match &name {
         TagName::Plaintext(_) => true,
@@ -238,12 +245,12 @@ where
         .map(|val| enc.encode_value(val, is_plaintext))
         .collect::<Result<Vec<_>, Error>>()?;
 
-    enc.encode_and_clause(enc_name, enc_values, is_plaintext, negate)
+    enc.encode_and_clause(enc_name, enc_values, is_plaintext, negate, clause_id)
 }
 
-fn encode_tag_exist<V, E>(names: &[TagName], enc: &mut E, negate: bool) -> Result<Option<V>, Error>
+fn encode_tag_exist<V, JC, E>(names: &[TagName], enc: &mut E, negate: bool, clause_id: &str) -> Result<Option<(V, JC)>, Error>
 where
-    E: TagQueryEncoder<Clause = V>,
+    E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
     match names.len() {
         0 => Ok(None),
@@ -253,36 +260,41 @@ where
                 _ => false,
             };
             let enc_name = enc.encode_name(&names[0])?;
-            enc.encode_exist_clause(enc_name, is_plaintext, negate)
+            enc.encode_exist_clause(enc_name, is_plaintext, negate, clause_id)
         }
         n => {
             let mut cs = Vec::with_capacity(n);
             for idx in 0..n {
-                if let Some(clause) = encode_tag_exist(&names[idx..=idx], enc, negate)? {
+                if let Some((clause, join)) = encode_tag_exist(&names[idx..=idx], enc, negate, clause_id)? {
                     cs.push(clause);
                 }
             }
-            enc.encode_conj_clause(ConjunctionOp::And, cs)
+            enc.encode_conj_clause(ConjunctionOp::And, cs, clause_id)
         }
     }
 }
 
-fn encode_tag_conj<V, E>(
+fn encode_tag_conj<V, JC, E>(
     op: ConjunctionOp,
     subqueries: &Vec<TagQuery>,
     enc: &mut E,
     negate: bool,
-) -> Result<Option<V>, Error>
+    clause_id: &str
+) -> Result<Option<(V, JC)>, Error>
 where
-    E: TagQueryEncoder<Clause = V>,
+    E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
     let op = if negate { op.negate() } else { op };
     let clauses = subqueries
         .into_iter()
-        .flat_map(|q| encode_tag_query(q, enc, negate).transpose())
+        .flat_map(|q| {
+            // let c = encode_tag_query(q, enc, negate, clause_id).transpose();
+            let (clause, join) = encode_tag_query(q, enc, negate, clause_id).unwrap().unwrap();
+            Some(Ok(clause))
+        })
         .collect::<Result<Vec<_>, Error>>()?;
 
-    enc.encode_conj_clause(op, clauses)
+    enc.encode_conj_clause(op, clauses, clause_id)
 }
 
 #[cfg(test)]
@@ -311,7 +323,7 @@ mod tests {
             name: Self::Arg,
             value: Self::Arg,
             _is_plaintext: bool,
-            clause_id: int,
+            clause_id: &str,
         ) -> Result<Option<Self::Clause>, Error> {
             Ok(Some(format!("{} {} {}", name, op.as_sql_str(), value, 1)))
         }

@@ -33,9 +33,10 @@ use crate::{
 mod provision;
 pub use provision::SqliteStoreOptions;
 
-const COUNT_QUERY: &'static str = "SELECT COUNT(*) FROM items i
-    WHERE profile_id = ?1 AND kind = ?2 AND category = ?3
-    AND (expiry IS NULL OR expiry > DATETIME('now'))";
+const COUNT_QUERY: &'static str = "SELECT COUNT(*) FROM items i";
+const COUNT_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3
+    AND (i.expiry IS NULL OR i.expiry > DATETIME('now'))";
+const COUNT_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
 const DELETE_QUERY: &'static str = "DELETE FROM items
     WHERE profile_id = ?1 AND kind = ?2 AND category = ?3 AND name = ?4";
 const FETCH_QUERY: &'static str = "SELECT i.id, i.value,
@@ -53,8 +54,10 @@ const UPDATE_QUERY: &'static str =
 const SCAN_QUERY: &'static str = "SELECT i.id, i.name, i.value,
     (SELECT GROUP_CONCAT(it.plaintext || ':' || HEX(it.name) || ':' || HEX(it.value))
         FROM items_tags it WHERE it.item_id = i.id) AS tags
-    FROM items i WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3
+    FROM items i";
+const SCAN_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3
     AND (i.expiry IS NULL OR i.expiry > DATETIME('now'))";
+const SCAN_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
 const DELETE_ALL_QUERY: &'static str = "DELETE FROM items AS i
     WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3";
 const TAG_INSERT_QUERY: &'static str = "INSERT INTO items_tags
@@ -276,7 +279,15 @@ impl QueryBackend for DbSession<Sqlite> {
             .await?;
             params.push(enc_category);
             let query =
-                extend_query::<SqliteStore>(COUNT_QUERY, &mut params, tag_filter, None, None)?;
+                extend_query::<SqliteStore>(
+                    COUNT_QUERY,
+                    COUNT_QUERY_WHERE,
+                    COUNT_QUERY_GROUP_BY,
+                    &mut params,
+                    tag_filter,
+                    None,
+                    None
+                )?;
             let mut active = acquire_session(&mut *self).await?;
             let count = sqlx::query_scalar_with(query.as_str(), params)
                 .fetch_one(active.connection_mut())
@@ -395,7 +406,7 @@ impl QueryBackend for DbSession<Sqlite> {
             .await?;
             params.push(enc_category);
             let query =
-                extend_query::<SqliteStore>(DELETE_ALL_QUERY, &mut params, tag_filter, None, None)?;
+                extend_query::<SqliteStore>(DELETE_ALL_QUERY, "", "", &mut params, tag_filter, None, None)?;
 
             let mut active = acquire_session(&mut *self).await?;
             let removed = sqlx::query_with(query.as_str(), params)
@@ -642,7 +653,15 @@ fn perform_scan<'q>(
             }
         }).await?;
         params.push(enc_category);
-        let query = extend_query::<SqliteStore>(SCAN_QUERY, &mut params, tag_filter, offset, limit)?;
+        let query = extend_query::<SqliteStore>(
+            SCAN_QUERY,
+            SCAN_QUERY_WHERE,
+            SCAN_QUERY_GROUP_BY,
+            &mut params,
+            tag_filter,
+            offset,
+            limit
+        )?;
 
         let mut batch = Vec::with_capacity(PAGE_SIZE);
 

@@ -34,6 +34,7 @@ where
 {
     type Arg = Vec<u8>;
     type Clause = String;
+    type JoinClause = String;
 
     fn encode_name(&mut self, name: &TagName) -> Result<Self::Arg, Error> {
         Ok(match name {
@@ -55,8 +56,8 @@ where
         enc_name: Self::Arg,
         enc_value: Self::Arg,
         is_plaintext: bool,
-        clause_id: int,
-    ) -> Result<Option<Self::Clause>, Error> {
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
         let idx = self.arguments.len();
         let (op_prefix, match_prefix) = match (is_plaintext, op.as_sql_str_for_prefix()) {
             (false, Some(pfx_op)) if enc_value.len() > 12 => {
@@ -92,9 +93,33 @@ where
         let join = format!(
             "LEFT JOIN items_tags it{} on it{}.item_id = i.id",
             clause_id,
+            clause_id,
         );
 
-        Ok(Some(join, query))
+        Ok(Some((query, join)))
+    }
+
+    fn encode_and_clause(
+        &mut self,
+        enc_name: Self::Arg,
+        enc_values: Vec<Self::Arg>,
+        is_plaintext: bool,
+        negate: bool,
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
+        return Ok(Some(("".to_string(), "".to_string())));
+        let args_in = Itertools::intersperse(std::iter::repeat("$$").take(enc_values.len()), ", ")
+            .collect::<String>();
+        let query = format!(
+            "i.id IN (SELECT item_id FROM items_tags WHERE name = $$ AND value {} ({}) AND plaintext = {})",
+            if negate { "NOT IN" } else { "IN" },
+            args_in,
+            if is_plaintext { 1 } else { 0 }
+        );
+        self.arguments.push(enc_name);
+        self.arguments.extend(enc_values);
+        Ok(Some((query, "".to_string())))
+
     }
 
     fn encode_exist_clause(
@@ -102,25 +127,27 @@ where
         enc_name: Self::Arg,
         is_plaintext: bool,
         negate: bool,
-    ) -> Result<Option<Self::Clause>, Error> {
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
         let query = format!(
             "i.id {} (SELECT item_id FROM items_tags WHERE name = $$ AND plaintext = {})",
             if negate { "NOT IN" } else { "IN" },
             if is_plaintext { 1 } else { 0 }
         );
         self.arguments.push(enc_name);
-        Ok(Some(query))
+        Ok(Some((query, "".to_string())))
     }
 
     fn encode_conj_clause(
         &mut self,
         op: ConjunctionOp,
         clauses: Vec<Self::Clause>,
-    ) -> Result<Option<Self::Clause>, Error> {
+        clause_id: &str,
+    ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
         let qc = clauses.len();
         if qc == 0 {
             if op == ConjunctionOp::Or {
-                return Ok(Some("0".to_string()));
+                return Ok(Some(("0".to_string(), "".to_string())));
             } else {
                 return Ok(None);
             }
@@ -138,7 +165,7 @@ where
         if qc > 1 {
             s.push(')');
         }
-        Ok(Some(s))
+        Ok(Some((s, "".to_string())))
     }
 }
 

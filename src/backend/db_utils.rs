@@ -541,16 +541,16 @@ pub fn encode_tag_filter<Q: QueryPrepare>(
     tag_filter: Option<TagFilter>,
     key: &ProfileKey,
     offset: usize,
-) -> Result<Option<(String, Vec<Vec<u8>>)>, Error> {
+) -> Result<Option<(String, Vec<Vec<u8>>, String)>, Error> {
     if let Some(tag_filter) = tag_filter {
         let tag_query = tag_query(tag_filter.query)?;
         let mut enc = TagSqlEncoder::new(
             |name| Ok(key.encrypt_tag_name(ProfileKey::prepare_input(name.as_bytes()))?),
             |value| Ok(key.encrypt_tag_value(ProfileKey::prepare_input(value.as_bytes()))?),
         );
-        if let Some(filter) = enc.encode_query(&tag_query)? {
+        if let Some((filter, joins)) = enc.encode_query(&tag_query)? {
             let filter = replace_arg_placeholders::<Q>(&filter, (offset as i64) + 1);
-            Ok(Some((filter, enc.arguments)))
+            Ok(Some((filter, enc.arguments, joins)))
         } else {
             Ok(None)
         }
@@ -587,8 +587,7 @@ pub fn extend_query<'q, Q: QueryPrepare>(
     query_where: &str,
     query_group_by: &str,
     args: &mut QueryParams<'q, Q::DB>,
-    tag_joins: &str,
-    tag_filter: Option<(String, Vec<Vec<u8>>)>,
+    tag_filter: Option<(String, Vec<Vec<u8>>, String)>,
     offset: Option<i64>,
     limit: Option<i64>,
 ) -> Result<String, Error>
@@ -597,22 +596,23 @@ where
     Vec<u8>: for<'e> Encode<'e, Q::DB> + Type<Q::DB>,
 {
     let mut query = query.to_string();
-    if tag_joins.is_some() {
-        query.push_str(tag_joins);
+
+    if let Some((_, _, ref join_clause)) = tag_filter {
+        query.push_str(&join_clause);
     };
     
-    if query_where.is_some() {
-        query = query.push_str(query_where);
+    if !query_where.is_empty() {
+        query.push_str(query_where);
     };
 
-    if let Some((filter_clause, filter_args)) = tag_filter {
+    if let Some((filter_clause, filter_args, _)) = tag_filter {
         args.extend(filter_args);
         query.push_str(" AND "); // assumes WHERE already occurs
         query.push_str(&filter_clause);
     };
 
-    if query_group_by.is_some() {
-        query = query.push_str(query_group_by);
+    if !query_group_by.is_empty() {
+        query.push_str(query_group_by);
     }
 
     if offset.is_some() || limit.is_some() {
