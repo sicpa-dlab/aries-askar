@@ -66,7 +66,7 @@ where
                 // on its own
                 let match_prefix = enc_value[..12].to_vec();
                 (
-                    format!(" AND SUBSTR(items_tags{}.value, 1, 12) {} ${}", clause_id, pfx_op, idx + 3),
+                    format!(" AND SUBSTR({}.value, 1, 12) {} ${}", clause_id, pfx_op, idx + 3),
                     Some(match_prefix),
                 )
             }
@@ -79,7 +79,7 @@ where
         }
 
         let query = format!(
-            "(items_tags{}.name = ${} AND items_tags{}.value {} ${}{} AND items_tags{}.plaintext = {})",
+            "({}.name = ${} AND {}.value {} ${}{} AND {}.plaintext = {}) ",
             clause_id,
             idx + 1,
             clause_id,
@@ -91,10 +91,11 @@ where
         );
 
         let join = format!(
-            "LEFT JOIN items_tags it{} on it{}.item_id = i.id",
+            " LEFT JOIN items_tags {} on {}.item_id = i.id",
             clause_id,
             clause_id,
         );
+        debug!("Let's create a join! {}", join);
 
         Ok(Some((query, join)))
     }
@@ -107,18 +108,29 @@ where
         negate: bool,
         clause_id: &str,
     ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
-        return Ok(Some(("".to_string(), "".to_string())));
+        // return Ok(Some(("".to_string(), "".to_string())));
         let args_in = Itertools::intersperse(std::iter::repeat("$$").take(enc_values.len()), ", ")
             .collect::<String>();
         let query = format!(
-            "i.id IN (SELECT item_id FROM items_tags WHERE name = $$ AND value {} ({}) AND plaintext = {})",
-            if negate { "NOT IN" } else { "IN" },
+            "{}.name = $$ AND {}.value {} ({}) AND {}.plaintext = {})",
+            clause_id,
+            clause_id,
+            if negate { "NOT AND" } else { "AND" },
             args_in,
+            clause_id,
             if is_plaintext { 1 } else { 0 }
         );
         self.arguments.push(enc_name);
         self.arguments.extend(enc_values);
-        Ok(Some((query, "".to_string())))
+
+        let join = format!(
+            " LEFT JOIN items_tags {} on {}.item_id = i.id",
+            clause_id,
+            clause_id,
+        );
+        debug!("Let's create a join! {}", join);
+
+        Ok(Some((query, join)))
 
     }
 
@@ -135,13 +147,22 @@ where
             if is_plaintext { 1 } else { 0 }
         );
         self.arguments.push(enc_name);
-        Ok(Some((query, "".to_string())))
+
+        let join = format!(
+            " LEFT JOIN items_tags {} on {}.item_id = i.id",
+            clause_id,
+            clause_id,
+        );
+        debug!("Let's create a join! {}", join);
+
+        Ok(Some((query, join)))
     }
 
     fn encode_conj_clause(
         &mut self,
         op: ConjunctionOp,
         clauses: Vec<Self::Clause>,
+        joins: Vec<Self::JoinClause>,
         clause_id: &str,
     ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
         let qc = clauses.len();
@@ -153,6 +174,7 @@ where
             }
         }
         let mut s = String::new();
+        let mut js = String::new();
         if qc > 1 {
             s.push('(');
         }
@@ -162,10 +184,16 @@ where
             }
             s.push_str(&clause);
         }
+        for (index, join_clause) in joins.into_iter().enumerate() {
+            if index > 0 {
+                js.push_str("\n");
+            }
+            js.push_str(&join_clause);
+        }
         if qc > 1 {
             s.push(')');
         }
-        Ok(Some((s, "".to_string())))
+        Ok(Some((s, js)))
     }
 }
 

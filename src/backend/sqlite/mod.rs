@@ -58,8 +58,8 @@ const SCAN_QUERY: &'static str = "SELECT i.id, i.name, i.value,
 const SCAN_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3
     AND (i.expiry IS NULL OR i.expiry > DATETIME('now'))";
 const SCAN_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
-const DELETE_ALL_QUERY: &'static str = "DELETE FROM items AS i
-    WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3";
+const DELETE_ALL_QUERY: &'static str = "DELETE FROM items AS i";
+const DELETE_ALL_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3";
 const TAG_INSERT_QUERY: &'static str = "INSERT INTO items_tags
     (item_id, name, value, plaintext) VALUES (?1, ?2, ?3, ?4)";
 const TAG_DELETE_QUERY: &'static str = "DELETE FROM items_tags

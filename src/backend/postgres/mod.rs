@@ -59,15 +59,17 @@ const UPDATE_QUERY: &'static str = "UPDATE items SET value=$5, expiry=$6
     WHERE profile_id=$1 AND kind=$2 AND category=$3 AND name=$4
     RETURNING id";
 const SCAN_QUERY: &'static str = "SELECT i.id, i.name, i.value,
-    (SELECT ARRAY_TO_STRING(ARRAY_AGG(it.plaintext || ':'
+    (ARRAY_TO_STRING(ARRAY_AGG(it.plaintext || ':'
         || ENCODE(it.name, 'hex') || ':' || ENCODE(it.value, 'hex')), ',')
-        FROM items_tags it WHERE it.item_id = i.id) tags
-    FROM items i";
+        ) tags
+    FROM items i
+    LEFT JOIN items_tags it on it.item_id = i.id";
 const SCAN_QUERY_WHERE: &'static str = "WHERE i.profile_id = $1 AND i.kind = $2 AND i.category = $3
     AND (i.expiry IS NULL OR i.expiry > CURRENT_TIMESTAMP)";
 const SCAN_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
-const DELETE_ALL_QUERY: &'static str = "DELETE FROM items i
-    WHERE i.profile_id = $1 AND i.kind = $2 AND i.category = $3";
+const DELETE_ALL_QUERY: &'static str = "DELETE FROM items
+    USING items AS i";
+const DELETE_ALL_QUERY_WHERE: &'static str = "WHERE i.profile_id = $1 AND i.kind = $2 AND i.category = $3";
 const TAG_INSERT_QUERY: &'static str = "INSERT INTO items_tags
     (item_id, name, value, plaintext) VALUES ($1, $2, $3, $4)";
 const TAG_DELETE_QUERY: &'static str = "DELETE FROM items_tags
@@ -432,7 +434,7 @@ impl QueryBackend for DbSession<Postgres> {
             params.push(enc_category);
             let query = extend_query::<PostgresStore>(
                 DELETE_ALL_QUERY,
-                "",
+                DELETE_ALL_QUERY_WHERE,
                 "",
                 &mut params,
                 tag_filter,

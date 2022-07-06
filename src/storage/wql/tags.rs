@@ -89,6 +89,7 @@ pub trait TagQueryEncoder {
         &mut self,
         op: ConjunctionOp,
         clauses: Vec<Self::Clause>,
+        joins: Vec<Self::JoinClause>,
         clause_id: &str,
     ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error>;
 }
@@ -169,37 +170,35 @@ fn encode_tag_query<V, JC, E>(query: &TagQuery, enc: &mut E, negate: bool, claus
 where
     E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
-    let mut new_clause_id: String = clause_id.to_owned();
-    new_clause_id.push_str("_1");
     match query {
         TagQuery::Eq(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Eq, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Eq, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::Neq(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Neq, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Neq, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::Gt(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Gt, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Gt, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::Gte(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Gte, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Gte, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::Lt(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Lt, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Lt, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::Lte(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Lte, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Lte, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::Like(tag_name, target_value) => {
-            encode_tag_op(CompareOp::Like, tag_name, target_value, enc, negate, &new_clause_id)
+            encode_tag_op(CompareOp::Like, tag_name, target_value, enc, negate, &clause_id.to_string())
         }
         TagQuery::In(tag_name, target_values) => {
-            encode_tag_in(tag_name, target_values, enc, negate, &new_clause_id)
+            encode_tag_in(tag_name, target_values, enc, negate, &clause_id.to_string())
         }
-        TagQuery::Exist(tag_names) => encode_tag_exist(tag_names, enc, negate, &new_clause_id),
-        TagQuery::And(subqueries) => encode_tag_conj(ConjunctionOp::And, subqueries, enc, negate, &new_clause_id),
-        TagQuery::Or(subqueries) => encode_tag_conj(ConjunctionOp::Or, subqueries, enc, negate, &new_clause_id),
-        TagQuery::Not(subquery) => encode_tag_query(subquery, enc, !negate, &new_clause_id),
+        TagQuery::Exist(tag_names) => encode_tag_exist(tag_names, enc, negate, &clause_id.to_string()),
+        TagQuery::And(subqueries) => encode_tag_conj(ConjunctionOp::And, subqueries, enc, negate, &clause_id.to_string()),
+        TagQuery::Or(subqueries) => encode_tag_conj(ConjunctionOp::Or, subqueries, enc, negate, &clause_id.to_string()),
+        TagQuery::Not(subquery) => encode_tag_query(subquery, enc, !negate, &clause_id.to_string()),
     }
 }
 
@@ -264,12 +263,15 @@ where
         }
         n => {
             let mut cs = Vec::with_capacity(n);
+            let mut jcs = Vec::with_capacity(n);
             for idx in 0..n {
-                if let Some((clause, join)) = encode_tag_exist(&names[idx..=idx], enc, negate, clause_id)? {
+                let new_clause_id: String = format!("{}_{}", clause_id, idx);
+                if let Some((clause, joins)) = encode_tag_exist(&names[idx..=idx], enc, negate, &new_clause_id)? {
                     cs.push(clause);
+                    jcs.push(joins);
                 }
             }
-            enc.encode_conj_clause(ConjunctionOp::And, cs, clause_id)
+            enc.encode_conj_clause(ConjunctionOp::And, cs, jcs, clause_id)
         }
     }
 }
@@ -285,16 +287,37 @@ where
     E: TagQueryEncoder<Clause = V, JoinClause = JC>,
 {
     let op = if negate { op.negate() } else { op };
-    let clauses = subqueries
-        .into_iter()
-        .flat_map(|q| {
-            // let c = encode_tag_query(q, enc, negate, clause_id).transpose();
-            let (clause, join) = encode_tag_query(q, enc, negate, clause_id).unwrap().unwrap();
-            Some(Ok(clause))
-        })
-        .collect::<Result<Vec<_>, Error>>()?;
+    // let clauses = subqueries
+    //     .into_iter()
+    //     .flat_map(|q| {
+    //         // let c = encode_tag_query(q, enc, negate, clause_id).transpose();
+    //         let (clause, _) = encode_tag_query(q, enc, negate, clause_id).unwrap().unwrap();
+    //         Some(Ok(clause))
+    //     })
+    //     .collect::<Result<Vec<_>, Error>>()?;
+    // let joins = subqueries
+    //     .into_iter()
+    //     .flat_map(|q| {
+    //         // let c = encode_tag_query(q, enc, negate, clause_id).transpose();
+    //         let (_, join) = encode_tag_query(q, enc, negate, clause_id).unwrap().unwrap();
+    //         Some(Ok(join))
+    //     })
+    //     .collect::<Result<Vec<_>, Error>>()?;
 
-    enc.encode_conj_clause(op, clauses, clause_id)
+    let subqueries_slice = subqueries.as_slice();
+    let n = subqueries_slice.len();
+    let mut cs = Vec::with_capacity(n);
+    let mut jcs = Vec::with_capacity(n);
+    for idx in 0..n {
+        let new_clause_id: String = format!("{}_{}", clause_id, idx);
+        if let Some((clause, joins)) = encode_tag_query(&subqueries_slice[idx], enc, negate, &new_clause_id)? {
+            cs.push(clause);
+            jcs.push(joins);
+        }
+    }
+    enc.encode_conj_clause(op, cs, jcs, clause_id)
+
+    // enc.encode_conj_clause(op, clauses, joins, clause_id)
 }
 
 #[cfg(test)]
