@@ -51,15 +51,21 @@ const INSERT_QUERY: &'static str =
 const UPDATE_QUERY: &'static str =
     "UPDATE items SET value=?5, expiry=?6 WHERE profile_id=?1 AND kind=?2
     AND category=?3 AND name=?4 RETURNING id";
+// const SCAN_QUERY: &'static str = "SELECT i.id, i.name, i.value,
+//     (SELECT GROUP_CONCAT(it.plaintext || ':' || HEX(it.name) || ':' || HEX(it.value))
+//         FROM items_tags it WHERE it.item_id = i.id) AS tags
+//     FROM items i";
 const SCAN_QUERY: &'static str = "SELECT i.id, i.name, i.value,
-    (SELECT GROUP_CONCAT(it.plaintext || ':' || HEX(it.name) || ':' || HEX(it.value))
-        FROM items_tags it WHERE it.item_id = i.id) AS tags
-    FROM items i";
+    (GROUP_CONCAT(it.plaintext || ':' || HEX(it.name) || ':' || HEX(it.value))
+        ) AS tags
+    FROM items i
+    LEFT JOIN items_tags it on it.item_id = i.id";
 const SCAN_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3
     AND (i.expiry IS NULL OR i.expiry > DATETIME('now'))";
 const SCAN_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
-const DELETE_ALL_QUERY: &'static str = "DELETE FROM items AS i";
-const DELETE_ALL_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3";
+const DELETE_ALL_QUERY: &'static str = "DELETE FROM items
+    WHERE items.profile_id = ?1 AND items.kind = ?2 AND items.category = ?3 AND items.id IN (SELECT i.id FROM items AS i";
+const DELETE_ALL_QUERY_WHERE: &'static str = "WHERE TRUE";
 const TAG_INSERT_QUERY: &'static str = "INSERT INTO items_tags
     (item_id, name, value, plaintext) VALUES (?1, ?2, ?3, ?4)";
 const TAG_DELETE_QUERY: &'static str = "DELETE FROM items_tags
@@ -406,7 +412,14 @@ impl QueryBackend for DbSession<Sqlite> {
             .await?;
             params.push(enc_category);
             let query =
-                extend_query::<SqliteStore>(DELETE_ALL_QUERY, "", "", &mut params, tag_filter, None, None)?;
+                extend_query::<SqliteStore>(
+                    DELETE_ALL_QUERY,
+                    DELETE_ALL_QUERY_WHERE,
+                    ")",
+                    &mut params,
+                    tag_filter,
+                    None,
+                    None)?;
 
             let mut active = acquire_session(&mut *self).await?;
             let removed = sqlx::query_with(query.as_str(), params)

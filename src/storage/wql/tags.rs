@@ -331,6 +331,7 @@ mod tests {
     impl TagQueryEncoder for TestEncoder {
         type Arg = String;
         type Clause = String;
+        type JoinClause = String;
 
         fn encode_name(&mut self, name: &TagName) -> Result<String, Error> {
             Ok(name.to_string())
@@ -346,9 +347,9 @@ mod tests {
             name: Self::Arg,
             value: Self::Arg,
             _is_plaintext: bool,
-            clause_id: &str,
-        ) -> Result<Option<Self::Clause>, Error> {
-            Ok(Some(format!("{} {} {}", name, op.as_sql_str(), value, 1)))
+            _clause_id: &str,
+        ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
+            Ok(Some((format!("{} {} {}", name, op.as_sql_str(), value), String::new())))
         }
 
         fn encode_exist_clause(
@@ -356,9 +357,10 @@ mod tests {
             name: Self::Arg,
             _is_plaintext: bool,
             negate: bool,
-        ) -> Result<Option<Self::Clause>, Error> {
+            _clause_id: &str,
+        ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
             let op = if negate { "NOT EXIST" } else { "EXIST" };
-            Ok(Some(format!("{}({})", op, name)))
+            Ok(Some((format!("{}({})", op, name), String::new())))
         }
 
         fn encode_and_clause(
@@ -367,18 +369,21 @@ mod tests {
             values: Vec<Self::Arg>,
             _is_plaintext: bool,
             negate: bool,
-        ) -> Result<Option<Self::Clause>, Error> {
+            _clause_id: &str,
+        ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
             let op = if negate { "AND NOT" } else { "AND" };
             let value =
                 Itertools::intersperse(values.iter().map(|v| v.as_str()), ", ").collect::<String>();
-            Ok(Some(format!("{} {} ({})", name, op, value)))
+            Ok(Some((format!("{} {} ({})", name, op, value), String::new())))
         }
 
         fn encode_conj_clause(
             &mut self,
             op: ConjunctionOp,
             clauses: Vec<Self::Clause>,
-        ) -> Result<Option<Self::Clause>, Error> {
+            _joins: Vec<Self::JoinClause>,
+            _clause_id: &str,
+        ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
             let mut r = String::new();
             r.push_str("(");
             r.extend(Itertools::intersperse(
@@ -386,7 +391,7 @@ mod tests {
                 op.as_sql_str(),
             ));
             r.push_str(")");
-            Ok(Some(r))
+            Ok(Some((r, String::new())))
         }
     }
 
@@ -454,7 +459,7 @@ mod tests {
             ))),
         ]);
         let query = TagQuery::Or(vec![condition_1, condition_2]);
-        let query_str = TestEncoder {}.encode_query(&query).unwrap().unwrap();
+        let (query_str, _) = TestEncoder {}.encode_query(&query).unwrap().unwrap();
         assert_eq!(query_str, "((enctag = encval AND ~plaintag = plainval) OR (enctag = encval AND ~plaintag != eggs))")
     }
 
@@ -481,7 +486,7 @@ mod tests {
             ))),
         ]);
         let query = TagQuery::Not(Box::new(TagQuery::Or(vec![condition_1, condition_2])));
-        let query_str = TestEncoder {}.encode_query(&query).unwrap().unwrap();
+        let (query_str, _) = TestEncoder {}.encode_query(&query).unwrap().unwrap();
         assert_eq!(query_str, "((enctag != encval OR ~plaintag != plainval) AND (enctag != encval OR ~plaintag = eggs))")
     }
 }

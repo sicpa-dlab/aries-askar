@@ -163,7 +163,7 @@ where
         op: ConjunctionOp,
         clauses: Vec<Self::Clause>,
         joins: Vec<Self::JoinClause>,
-        clause_id: &str,
+        _clause_id: &str,
     ) -> Result<Option<(Self::Clause, Self::JoinClause)>, Error> {
         let qc = clauses.len();
         if qc == 0 {
@@ -229,8 +229,11 @@ mod tests {
             |name: &str| Ok(format!("--{}--", name).into_bytes()),
             |value: &str| Ok(value.to_uppercase().into_bytes()),
         );
-        let query_str = enc.encode_query(&query).unwrap().unwrap();
-        assert_eq!(query_str, "((i.id IN (SELECT item_id FROM items_tags WHERE name = $1 AND value = $2 AND SUBSTR(value, 1, 12) = $3 AND plaintext = 0) AND i.id IN (SELECT item_id FROM items_tags WHERE name = $4 AND value = $5 AND plaintext = 1)) OR (i.id IN (SELECT item_id FROM items_tags WHERE name = $6 AND value = $7 AND SUBSTR(value, 1, 12) = $8 AND plaintext = 0) AND i.id IN (SELECT item_id FROM items_tags WHERE name = $9 AND value != $10 AND plaintext = 1)))");
+        let (query_str, join_str) = enc.encode_query(&query).unwrap().unwrap();
+        print!("Joins: \n{}\n\n", join_str);
+        assert_eq!(join_str, " LEFT JOIN items_tags it2_0_0 on it2_0_0.item_id = i.id\n LEFT JOIN items_tags it2_0_1 on it2_0_1.item_id = i.id\n LEFT JOIN items_tags it2_1_0 on it2_1_0.item_id = i.id\n LEFT JOIN items_tags it2_1_1 on it2_1_1.item_id = i.id");
+        print!("Joins: \nJoins passed!\n\n");
+        assert_eq!(query_str, "(((it2_0_0.name = $1 AND it2_0_0.value = $2 AND SUBSTR(it2_0_0.value, 1, 12) = $3 AND it2_0_0.plaintext = 0)  AND (it2_0_1.name = $4 AND it2_0_1.value = $5 AND it2_0_1.plaintext = 1) ) OR ((it2_1_0.name = $6 AND it2_1_0.value = $7 AND SUBSTR(it2_1_0.value, 1, 12) = $8 AND it2_1_0.plaintext = 0)  AND (it2_1_1.name = $9 AND it2_1_1.value != $10 AND it2_1_1.plaintext = 1) ))");
         let args = enc.arguments;
         assert_eq!(
             args,
