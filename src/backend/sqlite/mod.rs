@@ -33,7 +33,7 @@ use crate::{
 mod provision;
 pub use provision::SqliteStoreOptions;
 
-const COUNT_QUERY: &'static str = "SELECT COUNT(*) FROM items i";
+const COUNT_QUERY: &'static str = "SELECT COUNT(DISTINCT i.id) FROM items i";
 const COUNT_QUERY_WHERE: &'static str = "WHERE i.profile_id = ?1 AND i.kind = ?2 AND i.category = ?3
     AND (i.expiry IS NULL OR i.expiry > DATETIME('now'))";
 const COUNT_QUERY_GROUP_BY: &'static str = "GROUP BY i.id, i.name, i.value";
@@ -288,13 +288,14 @@ impl QueryBackend for DbSession<Sqlite> {
                 extend_query::<SqliteStore>(
                     COUNT_QUERY,
                     COUNT_QUERY_WHERE,
-                    COUNT_QUERY_GROUP_BY,
+                    "",
                     &mut params,
                     tag_filter,
                     None,
                     None
                 )?;
             let mut active = acquire_session(&mut *self).await?;
+            // debug!("Query:\n{}\n\nParams:\n{}\n\n", query, params.into_arguments());
             let count = sqlx::query_scalar_with(query.as_str(), params)
                 .fetch_one(active.connection_mut())
                 .await?;

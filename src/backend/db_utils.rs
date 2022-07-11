@@ -598,13 +598,13 @@ where
     let mut query = query.to_string();
     query.push_str("\n");
 
-    debug!("Preparing to push joins");
+    // debug!("Preparing to push joins");
     if let Some((_, _, ref join_clause)) = tag_filter {
-        debug!("Pushing join clause: {}", &join_clause);
+        // debug!("Pushing join clause: {}", &join_clause);
         query.push_str(&join_clause);
         query.push_str("\n");
     };
-    debug!("Finished pushing joins");
+    // debug!("Finished pushing joins");
     
     if !query_where.is_empty() {
         query.push_str(query_where);
@@ -625,7 +625,7 @@ where
     if offset.is_some() || limit.is_some() {
         query = Q::limit_query(query, args, offset, limit);
     };
-    debug!("Query: {}", query);
+    // debug!("Query: {}", query);
     Ok(query)
 }
 
