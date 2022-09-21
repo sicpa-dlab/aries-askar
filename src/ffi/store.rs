@@ -92,7 +92,8 @@ where
     }
 
     pub async fn borrow(&self, handle: K) -> Result<TryMutexGuard<V>, Error> {
-        Ok(self.map
+        Ok(self
+            .map
             .read()
             .await
             .get(&handle)
