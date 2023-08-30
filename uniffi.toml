@@ -1,0 +1,2 @@
+[bindings.kotlin-native]
+library_file = "target/aarch64-linux-android/debug/libaries_askar.a"
