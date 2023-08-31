@@ -1,15 +1,63 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import java.util.*
 
+buildscript{
+    repositories{
+        mavenCentral()
+    }
+    dependencies{
+        classpath("org.jetbrains.kotlinx:atomicfu-gradle-plugin:0.22.0")
+    }
+}
+apply(plugin = "kotlinx-atomicfu")
+
 plugins {
     kotlin("multiplatform") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
     id("maven-publish")
+    id("com.android.library").version("7.4.0")
 }
 
-repositories {
-    mavenCentral()
+android{
+    apply(plugin = "kotlinx-atomicfu")
+    namespace = "aries_askar"
+    compileSdk = 33
+    defaultConfig{
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        minSdk = 24
+
+        testOptions {
+            execution = "ANDROIDX_TEST_ORCHESTRATOR"
+        }
+    }
+
+    dependencies {
+        androidTestImplementation("androidx.test:runner:1.1.0")
+        androidTestUtil("androidx.test:orchestrator:1.1.0")
+    }
 }
+
+val askarBindings = file("askarBindings")
+val binaries = file("libs")
+
+
+val processBinaries = tasks.register("processBinaries", Copy::class) {
+    val directory = buildDir
+        .resolve("processedResources")
+        .resolve("jvm")
+        .resolve("main")
+
+    from(binaries.resolve("darwin-universal"))
+    include("*.dylib")
+    include("*.so")
+    into(directory)
+}
+
+tasks.withType<ProcessResources>{
+    dependsOn(processBinaries)
+}
+
 
 // Stub secrets to let the project sync and build without the publication values set up
 ext["githubUsername"] = null
@@ -61,12 +109,14 @@ publishing{
     }
 }
 
+
 private enum class PlatformType {
     APPLE,
     ANDROID
 }
 
 kotlin {
+    targetHierarchy.default()
 
     fun addLibs(libDirectory: String, target: KotlinNativeTarget) {
         target.compilations.getByName("main") {
@@ -80,7 +130,21 @@ kotlin {
             linkerOpts("-L${libDirectory}", "-laries_askar")
             linkerOpts("-Wl,-framework,Security")
         }
+    }
 
+    android{
+        compilations.all{
+            kotlinOptions.jvmTarget = "1.8"
+        }
+    }
+
+    jvm{
+        compilations.all{
+            kotlinOptions.jvmTarget = "1.8"
+        }
+        testRuns["test"].executionTask.configure{
+            useJUnitPlatform()
+        }
     }
 
     macosX64{
@@ -108,28 +172,9 @@ kotlin {
         addLibs(libDirectory, this)
     }
 
-    androidNativeArm64(){
-        val libDirectory = "${projectDir}/../../target/aarch64-linux-android/release"
-        addLibs(libDirectory, this)
-    }
-
-    androidNativeX64(){
-        val libDirectory = "${projectDir}/../../target/i686-linux-android/release"
-        addLibs(libDirectory, this)
-    }
-
-    androidNativeX86(){
-        val libDirectory = "${projectDir}/../../target/x86_64-linux-android/release"
-        addLibs(libDirectory, this)
-    }
-
-    androidNativeArm32(){
-        val libDirectory = "${projectDir}/../../target/armv7-linux-androideabi/release"
-        addLibs(libDirectory, this)
-    }
-
     sourceSets {
         val commonMain by getting {
+            kotlin.srcDir(askarBindings.resolve("commonMain").resolve("kotlin"))
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.0-RC")
@@ -138,5 +183,24 @@ kotlin {
         val commonTest by getting {
             this.dependsOn(commonMain)
         }
+
+        val androidMain by getting {
+            kotlin.srcDir(binaries)
+            kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
+            dependencies{
+                implementation("net.java.dev.jna:jna:5.13.@aar")
+                implementation("org.jetbrains.kotlinx:atomicfu:0.20.2")
+            }
+        }
+
+        val jvmMain by getting {
+            kotlin.srcDir(binaries)
+            kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
+            dependencies{
+                implementation("net.java.dev.jna:jna:5.13.0")
+            }
+        }
     }
 }
+
+
