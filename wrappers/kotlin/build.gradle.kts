@@ -39,7 +39,7 @@ android{
 }
 
 val askarBindings = file("askarBindings")
-val binaries = file("libs")
+val binaries = file("../../targets/")
 
 
 val processBinaries = tasks.register("processBinaries", Copy::class) {
@@ -48,7 +48,7 @@ val processBinaries = tasks.register("processBinaries", Copy::class) {
         .resolve("jvm")
         .resolve("main")
 
-    from(binaries.resolve("darwin-universal"))
+    from(binaries.resolve("darwin-universal").resolve("release"))
     include("*.dylib")
     include("*.so")
     into(directory)
