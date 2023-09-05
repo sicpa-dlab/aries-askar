@@ -15,31 +15,11 @@ plugins {
     kotlin("multiplatform") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
     id("maven-publish")
-    id("com.android.library").version("7.4.0")
-}
-
-android{
-    apply(plugin = "kotlinx-atomicfu")
-    namespace = "aries_askar"
-    compileSdk = 33
-    defaultConfig{
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        minSdk = 24
-
-        testOptions {
-            execution = "ANDROIDX_TEST_ORCHESTRATOR"
-        }
-    }
-
-    dependencies {
-        androidTestImplementation("androidx.test:runner:1.1.0")
-        androidTestUtil("androidx.test:orchestrator:1.1.0")
-    }
+    id("com.android.library")
 }
 
 val askarBindings = file("askarBindings")
-val binaries = file("../../targets/")
+val binaries = file("../../../target")
 
 
 val processBinaries = tasks.register("processBinaries", Copy::class) {
@@ -83,6 +63,12 @@ fun getExtraString(name: String) = ext[name]?.toString()
 
 group = "org.hyperledger.aries-askar"
 version = "${getExtraString("askarVersion")}-wrapper.${getExtraString("wrapperVersion")}"
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
+    testImplementation("org.testng:testng:7.1.0")
+    testImplementation("org.testng:testng:7.1.0")
+}
 
 publishing{
     repositories{
@@ -147,41 +133,56 @@ kotlin {
         }
     }
 
-    macosX64{
-        val libDirectory = "${projectDir}/../../target/x86_64-apple-darwin/release"
-        addLibs(libDirectory, this)
-    }
+//    macosX64{
+//        val libDirectory = "${projectDir}/../../../target/x86_64-apple-darwin/release"
+//        addLibs(libDirectory, this)
+//    }
+//
+//    macosArm64{
+//        val libDirectory = "${projectDir}/../../../target/aarch64-apple-darwin/release"
+//        addLibs(libDirectory, this)
+//    }
+//
+//    iosX64 {
+//        val libDirectory = "${projectDir}/../../../target/x86_64-apple-ios/release"
+//        addLibs(libDirectory, this)
+//    }
+//
+//    iosSimulatorArm64 {
+//        val libDirectory = "${projectDir}/../../../target/aarch64-apple-ios-sim/release"
+//        addLibs(libDirectory, this)
+//    }
+//
+//    iosArm64 {
+//        val libDirectory = "${projectDir}/../../../target/aarch64-apple-ios/release"
+//        addLibs(libDirectory, this)
+//    }
 
-    macosArm64{
-        val libDirectory = "${projectDir}/../../target/aarch64-apple-darwin/release"
-        addLibs(libDirectory, this)
-    }
-
-    iosX64 {
-        val libDirectory = "${projectDir}/../../target/x86_64-apple-ios/release"
-        addLibs(libDirectory, this)
-    }
-
-    iosSimulatorArm64 {
-        val libDirectory = "${projectDir}/../../target/aarch64-apple-ios-sim/release"
-        addLibs(libDirectory, this)
-    }
-
-    iosArm64 {
-        val libDirectory = "${projectDir}/../../target/aarch64-apple-ios/release"
-        addLibs(libDirectory, this)
+    listOf(
+        iosX64(),
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach {
+        it.binaries.framework {
+            baseName = "shared"
+        }
     }
 
     sourceSets {
         val commonMain by getting {
             kotlin.srcDir(askarBindings.resolve("commonMain").resolve("kotlin"))
             dependencies {
+                implementation("com.squareup.okio:okio:3.2.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.5.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.0-RC")
             }
         }
         val commonTest by getting {
             this.dependsOn(commonMain)
+            dependencies{
+                implementation(kotlin("test"))
+            }
         }
 
         val androidMain by getting {
@@ -189,7 +190,7 @@ kotlin {
             kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
             dependencies{
                 implementation("net.java.dev.jna:jna:5.13.@aar")
-                implementation("org.jetbrains.kotlinx:atomicfu:0.20.2")
+                implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
             }
         }
 
@@ -200,7 +201,30 @@ kotlin {
                 implementation("net.java.dev.jna:jna:5.13.0")
             }
         }
+
+        val nativeMain by getting {
+            kotlin.srcDir(askarBindings.resolve("nativeMain").resolve("kotlin"))
+        }
     }
 }
 
 
+android{
+    apply(plugin = "kotlinx-atomicfu")
+    namespace = "aries_askar"
+    compileSdk = 33
+    defaultConfig{
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        minSdk = 24
+
+        testOptions {
+            execution = "ANDROIDX_TEST_ORCHESTRATOR"
+        }
+    }
+
+    dependencies {
+        androidTestImplementation("androidx.test:runner:1.5.2")
+        androidTestUtil("androidx.test:orchestrator:1.4.2")
+    }
+}

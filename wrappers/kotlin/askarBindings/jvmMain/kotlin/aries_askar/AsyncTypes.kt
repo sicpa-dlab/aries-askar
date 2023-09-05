@@ -7,10 +7,6 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-
-import kotlin.coroutines.suspendCoroutine
-import kotlinx.coroutines.coroutineScope
-
 // FFI type for callback handlers
 actual class UniFfiFutureCallbackUInt8(private val inner: (ULong, UByte, RustCallStatusByValue) -> Unit) : com.sun.jna.Callback {
     // Note: callbackData does not contain a valid pointer. We could pass Rust a pointer/usize to represent the
