@@ -1,3 +1,4 @@
+import com.google.wireless.android.sdk.stats.GradleBuildVariant.KotlinOptions
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import java.util.*
 
@@ -15,11 +16,11 @@ plugins {
     kotlin("multiplatform") version "1.8.21"
     kotlin("plugin.serialization") version "1.8.21"
     id("maven-publish")
-    id("com.android.library")
+    id("com.android.library") version "7.4.0"
 }
 
 val askarBindings = file("askarBindings")
-val binaries = file("../../../target")
+val binaries = file("../../target")
 
 
 val processBinaries = tasks.register("processBinaries", Copy::class) {
@@ -106,9 +107,12 @@ kotlin {
 
     fun addLibs(libDirectory: String, target: KotlinNativeTarget) {
         target.compilations.getByName("main") {
-            val aries_askar by cinterops.creating {
-                this.includeDirs("libraries/headers/")
-                packageName("aries_askar")
+            val uniffi by cinterops.creating {
+                includeDirs(
+                    projectDir.absolutePath + "/src/nativeInterop/cinterop/headers/aries_askar/"
+                )
+                packageName("aries_askar.cinterop")
+                extraOpts("-libraryPath", libDirectory)
             }
         }
 
@@ -118,7 +122,7 @@ kotlin {
         }
     }
 
-    android{
+    androidTarget{
         compilations.all{
             kotlinOptions.jvmTarget = "1.8"
         }
@@ -133,42 +137,37 @@ kotlin {
         }
     }
 
-//    macosX64{
-//        val libDirectory = "${projectDir}/../../../target/x86_64-apple-darwin/release"
-//        addLibs(libDirectory, this)
-//    }
-//
-//    macosArm64{
-//        val libDirectory = "${projectDir}/../../../target/aarch64-apple-darwin/release"
-//        addLibs(libDirectory, this)
-//    }
-//
-//    iosX64 {
-//        val libDirectory = "${projectDir}/../../../target/x86_64-apple-ios/release"
-//        addLibs(libDirectory, this)
-//    }
-//
-//    iosSimulatorArm64 {
-//        val libDirectory = "${projectDir}/../../../target/aarch64-apple-ios-sim/release"
-//        addLibs(libDirectory, this)
-//    }
-//
-//    iosArm64 {
-//        val libDirectory = "${projectDir}/../../../target/aarch64-apple-ios/release"
-//        addLibs(libDirectory, this)
-//    }
+    macosX64{
+        val libDirectory = "${projectDir}/../../target/x86_64-apple-darwin/release"
+        addLibs(libDirectory, this)
+    }
 
-    listOf(
-        iosX64(),
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach {
-        it.binaries.framework {
-            baseName = "shared"
-        }
+    macosArm64{
+        val libDirectory = "${projectDir}/../../target/aarch64-apple-darwin/release"
+        addLibs(libDirectory, this)
+    }
+
+    iosX64 {
+        val libDirectory = "${projectDir}/../../target/x86_64-apple-ios/release"
+        addLibs(libDirectory, this)
+    }
+
+    iosSimulatorArm64 {
+        val libDirectory = "${projectDir}/../../target/aarch64-apple-ios-sim/release"
+        addLibs(libDirectory, this)
+    }
+
+    iosArm64 {
+        val libDirectory = "${projectDir}/../../target/aarch64-apple-ios/release"
+        addLibs(libDirectory, this)
     }
 
     sourceSets {
+
+        all {
+          languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
+        }
+
         val commonMain by getting {
             kotlin.srcDir(askarBindings.resolve("commonMain").resolve("kotlin"))
             dependencies {
@@ -202,8 +201,16 @@ kotlin {
             }
         }
 
+        val jvmTest by getting {
+            dependsOn(jvmMain)
+        }
+
         val nativeMain by getting {
             kotlin.srcDir(askarBindings.resolve("nativeMain").resolve("kotlin"))
+        }
+
+        val nativeTest by getting{
+            dependsOn(nativeMain)
         }
     }
 }

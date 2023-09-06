@@ -1,4 +1,4 @@
-package askar.aries_askar_actual
+package aries_askar_actual
 
 import kotlin.experimental.ExperimentalNativeApi
 
