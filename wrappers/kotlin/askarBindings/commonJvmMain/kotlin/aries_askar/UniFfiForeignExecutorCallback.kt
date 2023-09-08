@@ -1,7 +1,6 @@
 package aries_askar
 
 import com.sun.jna.Callback
-import com.sun.jna.Pointer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

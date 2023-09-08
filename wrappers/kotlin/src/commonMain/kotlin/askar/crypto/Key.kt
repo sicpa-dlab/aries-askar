@@ -1,7 +1,9 @@
-package aries_askar_actual.crypto
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
+package askar.crypto
 
 import aries_askar.*
-import aries_askar_actual.toUbyteList
+import askar.toUbyteList
 import kotlinx.serialization.json.Json
 
 enum class SigAlgs (val alg: String) {

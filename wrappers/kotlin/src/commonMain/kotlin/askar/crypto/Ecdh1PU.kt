@@ -1,8 +1,8 @@
-package aries_askar_actual.crypto
+package askar.crypto
 
 import aries_askar.AskarKeyAlg
 import aries_askar.EncryptedBuffer
-import aries_askar_actual.toUbyteList
+import askar.toUbyteList
 
 class Ecdh1PU(
     private val algId: String,

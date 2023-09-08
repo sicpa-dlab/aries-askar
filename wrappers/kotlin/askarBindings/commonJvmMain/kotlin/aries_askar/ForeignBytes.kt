@@ -1,6 +1,5 @@
 package aries_askar
 
-import com.sun.jna.Pointer
 import com.sun.jna.Structure
 
 @Structure.FieldOrder("len", "data")

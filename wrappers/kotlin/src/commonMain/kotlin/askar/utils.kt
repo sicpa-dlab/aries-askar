@@ -1,4 +1,4 @@
-package aries_askar_actual
+package askar
 
 
     internal fun String.toUbyteList(): List<UByte> {

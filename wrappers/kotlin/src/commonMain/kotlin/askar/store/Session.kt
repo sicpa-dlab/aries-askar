@@ -1,8 +1,8 @@
-package aries_askar_actual.store
+package askar.store
 
 import aries_askar.*
-import aries_askar_actual.crypto.Key
-import aries_askar_actual.toUbyteList
+import askar.crypto.Key
+import askar.toUbyteList
 
 class Session(private var handle: AskarSession?, private val isTxn: Boolean) {
 

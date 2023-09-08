@@ -1,6 +1,5 @@
-package aries_askar_actual.store
+package askar.store
 
-import aries_askar.AskarKeyAlg
 import aries_askar.AskarScan
 import aries_askar.AskarStore
 import aries_askar.AskarStoreManager
@@ -79,21 +78,21 @@ class Store(private val handle: AskarStore, private val uri: String) {
         suspend fun provision(
             uri: String,
             keyMethod: KdfMethod? = null,
-            passKey: String? = null,
+            passkey: String? = null,
             profile: String? = null,
             recreate: Boolean
         ): Store {
-            val handle = storeManger.provision(uri, keyMethod?.method, passKey, profile, recreate)
+            val handle = storeManger.provision(uri, keyMethod?.method, passkey, profile, recreate)
             return Store(handle, uri)
         }
 
         suspend fun open(
             uri: String,
             keyMethod: KdfMethod? = null,
-            passKey: String? = null,
+            passkey: String? = null,
             profile: String? = null
         ): Store {
-            val handle = storeManger.open(uri, keyMethod?.method, passKey, profile)
+            val handle = storeManger.open(uri, keyMethod?.method, passkey, profile)
             return Store(handle, uri)
         }
 

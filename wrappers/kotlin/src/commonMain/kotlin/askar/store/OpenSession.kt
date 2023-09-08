@@ -1,4 +1,4 @@
-package aries_askar_actual.store
+package askar.store
 
 import aries_askar.AskarStore
 

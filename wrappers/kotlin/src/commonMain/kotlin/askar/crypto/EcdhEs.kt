@@ -1,4 +1,4 @@
-package aries_askar_actual.crypto
+package askar.crypto
 
 import aries_askar.AskarKeyAlg
 import aries_askar.EncryptedBuffer

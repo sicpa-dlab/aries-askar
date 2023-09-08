@@ -184,21 +184,29 @@ kotlin {
             }
         }
 
+        val commonJvmMain by creating {
+            kotlin.srcDir(askarBindings.resolve("commonJvmMain").resolve("kotlin"))
+            dependencies{
+                implementation("net.java.dev.jna:jna:5.13.0")
+            }
+            dependsOn(commonMain)
+        }
+
         val androidMain by getting {
             kotlin.srcDir(binaries)
-            kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
             dependencies{
-                implementation("net.java.dev.jna:jna:5.13.@aar")
+                implementation("net.java.dev.jna:jna:5.13.0@aar")
                 implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
             }
+            dependsOn(commonJvmMain)
         }
 
         val jvmMain by getting {
             kotlin.srcDir(binaries)
-            kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
             dependencies{
                 implementation("net.java.dev.jna:jna:5.13.0")
             }
+            dependsOn(commonJvmMain)
         }
 
         val jvmTest by getting {

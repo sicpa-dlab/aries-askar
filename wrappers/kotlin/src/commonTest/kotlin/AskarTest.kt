@@ -1,102 +1,100 @@
-package tech.indicio.holdr
-
-
 import aries_askar.AskarStoreManager
+import askar.store.KdfMethod
+import askar.store.Store
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
-import tech.indicio.holdr.AskarUtils.*
 import kotlin.test.*
 import kotlin.test.Test
 
 
 class AskarTest {
 
-//    private lateinit var store: Store
-//
-//
-//    @BeforeTest
-//    fun beforeEach() {
-//        runBlocking {
-//            store = setupWallet()
-//        }
-//    }
-//
-//    @AfterTest
-//    fun afterEach() {
-//        runBlocking {
-//            store.close(true)
-//        }
-//    }
+    private lateinit var store: Store
+    @BeforeTest
+    fun beforeEach() {
+        runBlocking {
+            store = setupWallet()
+        }
+    }
+
+    @AfterTest
+    fun afterEach() {
+        runBlocking {
+            store.close()
+        }
+    }
 
     @Test
     fun argon2imod() {
         runBlocking {
+            val argonStore = Store.provision(
+                recreate = true,
+                passkey = "abc",
+                uri = testStoreUri + "1", //Cannot have duplicate URI otherwise error is thrown
+                keyMethod = KdfMethod.Argon2IMod,
+                profile = "test"
+            )
 
-            val store = AskarStoreManager().provision("sqlite://local.db" + "1", null, "abc", "test", true)
+            assertEquals(testStoreUri + "1", argonStore.uri())
 
-//            val argonStore = Store.provision(
-//                recreate = true,
-//                passkey = "abc",
-//                uri = testStoreUri + "1", //Cannot have duplicate URI otherwise error is thrown
-//                keyMethod = StoreKeyMethod(KdfMethod.Argon2IMod),
-//                profile = "test"
-//            )
-//
-//            val session = argonStore.openSession()
-//            assertNull(session.fetch("unknownCategory", "unknownKey"))
-//            argonStore.close()
+            val session = argonStore.openSession()
+            val entry = session.fetch("unknownCategory", "unknownKey")
+            assertNull(entry)
+            session.close()
+            argonStore.close()
         }
     }
-//
-//    @Test
-//    fun argon2iint() {
-//        runBlocking {
-//            val argonStore = Store.provision(
-//                recreate = true,
-//                passkey = "abc",
-//                uri = testStoreUri + "1", //Cannot have duplicate URI otherwise error is thrown
-//                keyMethod = StoreKeyMethod(KdfMethod.Argon2IInt),
-//                profile = "test"
-//            )
-//
-//            val session = argonStore.openSession()
-//            assertNull(session.fetch("unknownCategory", "unknownKey"))
-//            argonStore.close()
-//        }
-//    }
-//
-//    @Test
-//    fun rekey() {
-//        runBlocking {
-//            val initialKey = Store.generateRawKey("1234") ?: throw Error("Key came back as null")
-//            val storage = "./tmp"
-//            var newStore = Store.provision(
-//                recreate = true,
-//                profile = "rekey",
-//                uri = "sqlite://$storage/rekey.db",
-//                keyMethod = StoreKeyMethod(KdfMethod.Raw),
-//                passkey = initialKey
-//            )
-//            val newKey = Store.generateRawKey("12345") ?: throw Error("Key came back as null")
-//            newStore.rekey(StoreKeyMethod(KdfMethod.Raw), newKey)
-//            newStore.close()
-//            assertFails {
-//                Store.open(
-//                    profile = "rekey",
-//                    uri = "sqlite://$storage/rekey.db",
-//                    keyMethod = StoreKeyMethod(KdfMethod.Raw),
-//                    passkey = initialKey
-//                )
-//            }
-//            newStore = Store.open(
-//                profile = "rekey",
-//                uri = "sqlite://$storage/rekey.db",
-//                keyMethod = StoreKeyMethod(KdfMethod.Raw),
-//                passkey = newKey
-//            )
-//            newStore.close(true)
-//        }
-//    }
+
+    @Test
+    fun argon2iint() {
+        runBlocking {
+            val argonStore = Store.provision(
+                recreate = true,
+                passkey = "abc",
+                uri = testStoreUri + "1", //Cannot have duplicate URI otherwise error is thrown
+                keyMethod = KdfMethod.Argon2IInt,
+                profile = "test"
+            )
+
+            val session = argonStore.openSession()
+            assertNull(session.fetch("unknownCategory", "unknownKey"))
+            session.close()
+            argonStore.close()
+        }
+    }
+
+    @Test
+    fun rekey() {
+        runBlocking {
+            val initialKey = Store.generateRawKey("1234")
+            val storage = "./tmp"
+            var newStore = Store.provision(
+                recreate = true,
+                profile = "rekey",
+                uri = "sqlite://$storage/rekey.db",
+                keyMethod = KdfMethod.Raw,
+                passkey = initialKey
+            )
+            val newKey = Store.generateRawKey("12345")
+            newStore.rekey(KdfMethod.Raw, newKey)
+            newStore.close()
+            assertFails {
+                Store.open(
+                    profile = "rekey",
+                    uri = "sqlite://$storage/rekey.db",
+                    keyMethod = KdfMethod.Raw,
+                    passkey = initialKey
+                )
+            }
+            println("store rekeyed")
+            newStore = Store.open(
+                profile = "rekey",
+                uri = "sqlite://$storage/rekey.db",
+                keyMethod = KdfMethod.Raw,
+                passkey = newKey
+            )
+            newStore.close(true)
+        }
+    }
 //
 //    @Test
 //    fun insert() {

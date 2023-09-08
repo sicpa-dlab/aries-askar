@@ -1,4 +1,4 @@
-package aries_askar_actual.crypto
+package askar.crypto
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString

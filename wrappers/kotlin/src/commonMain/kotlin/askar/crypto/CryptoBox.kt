@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalUnsignedTypes::class)
 
-package aries_askar_actual.crypto
+package askar.crypto
 
 import aries_askar.AskarLocalKey
 
