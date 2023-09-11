@@ -6,9 +6,12 @@ import kotlin.test.*
 import kotlin.test.Test
 
 
+expect fun databaseUri(): String
+
 class AskarTest {
 
-    private lateinit var store: Store
+
+    private var store: Store? = null
     @BeforeTest
     fun beforeEach() {
         runBlocking {
@@ -19,7 +22,7 @@ class AskarTest {
     @AfterTest
     fun afterEach() {
         runBlocking {
-            store.close()
+            store?.close()
         }
     }
 
@@ -66,11 +69,10 @@ class AskarTest {
     fun rekey() {
         runBlocking {
             val initialKey = Store.generateRawKey("1234")
-            val storage = "./tmp"
             var newStore = Store.provision(
                 recreate = true,
                 profile = "rekey",
-                uri = "sqlite://$storage/rekey.db",
+                uri = "sqlite://${databaseUri()}/rekey.db",
                 keyMethod = KdfMethod.Raw,
                 passkey = initialKey
             )
@@ -80,7 +82,7 @@ class AskarTest {
             assertFails {
                 Store.open(
                     profile = "rekey",
-                    uri = "sqlite://$storage/rekey.db",
+                    uri = "sqlite://${databaseUri()}/rekey.db",
                     keyMethod = KdfMethod.Raw,
                     passkey = initialKey
                 )
@@ -88,7 +90,7 @@ class AskarTest {
             println("store rekeyed")
             newStore = Store.open(
                 profile = "rekey",
-                uri = "sqlite://$storage/rekey.db",
+                uri = "sqlite://${databaseUri()}/rekey.db",
                 keyMethod = KdfMethod.Raw,
                 passkey = newKey
             )

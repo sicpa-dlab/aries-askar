@@ -37,7 +37,7 @@ fun getRawKey(): String {
 //    }
 
 
-const val testStoreUri = "sqlite://local.db"
+val testStoreUri = "sqlite://${databaseUri()}/test.db"
 
 suspend fun setupWallet(): Store {
     val key = getRawKey()

@@ -13,4 +13,4 @@ build
 *.db-shm
 *.db-wal
 target
-src/main/jnilibs
+src/androidMain/jnilibs

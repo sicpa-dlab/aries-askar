@@ -1,4 +1,5 @@
 import com.google.wireless.android.sdk.stats.GradleBuildVariant.KotlinOptions
+import org.jetbrains.kotlin.gradle.plugin.KotlinTargetHierarchy
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import java.util.*
 
@@ -65,6 +66,7 @@ fun getExtraString(name: String) = ext[name]?.toString()
 group = "org.hyperledger.aries-askar"
 version = "${getExtraString("askarVersion")}-wrapper.${getExtraString("wrapperVersion")}"
 dependencies {
+    testImplementation("androidx.test:monitor:1.6.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
     testImplementation("org.testng:testng:7.1.0")
@@ -126,6 +128,8 @@ kotlin {
         compilations.all{
             kotlinOptions.jvmTarget = "1.8"
         }
+        instrumentedTestVariant.sourceSetTree.set(KotlinTargetHierarchy.SourceSetTree.test)
+        unitTestVariant.sourceSetTree.set(KotlinTargetHierarchy.SourceSetTree.unitTest)
     }
 
     jvm{
@@ -177,40 +181,38 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.0-RC")
             }
         }
+
         val commonTest by getting {
-            this.dependsOn(commonMain)
             dependencies{
                 implementation(kotlin("test"))
             }
         }
 
-        val commonJvmMain by creating {
-            kotlin.srcDir(askarBindings.resolve("commonJvmMain").resolve("kotlin"))
+        val androidMain by getting {
+            kotlin.srcDir(binaries)
+            kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
+            dependencies{
+                implementation("net.java.dev.jna:jna:5.7.0@aar")
+                implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
+            }
+            dependsOn(commonMain)
+        }
+
+        val androidUnitTest by getting {
+            dependsOn(commonTest)
+        }
+
+        val jvmMain by getting {
+            kotlin.srcDir(binaries)
+            kotlin.srcDir(askarBindings.resolve("jvmMain").resolve("kotlin"))
             dependencies{
                 implementation("net.java.dev.jna:jna:5.13.0")
             }
             dependsOn(commonMain)
         }
 
-        val androidMain by getting {
-            kotlin.srcDir(binaries)
-            dependencies{
-                implementation("net.java.dev.jna:jna:5.13.0@aar")
-                implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
-            }
-            dependsOn(commonJvmMain)
-        }
-
-        val jvmMain by getting {
-            kotlin.srcDir(binaries)
-            dependencies{
-                implementation("net.java.dev.jna:jna:5.13.0")
-            }
-            dependsOn(commonJvmMain)
-        }
-
         val jvmTest by getting {
-            dependsOn(jvmMain)
+            dependsOn(commonTest)
         }
 
         val nativeMain by getting {
@@ -225,8 +227,9 @@ kotlin {
 
 
 android{
+    sourceSets["main"].jniLibs.srcDir("src/androidMain/jniLibs")
     apply(plugin = "kotlinx-atomicfu")
-    namespace = "aries_askar"
+    namespace = "askar"
     compileSdk = 33
     defaultConfig{
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
