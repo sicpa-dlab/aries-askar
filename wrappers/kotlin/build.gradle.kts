@@ -1,6 +1,7 @@
 import com.google.wireless.android.sdk.stats.GradleBuildVariant.KotlinOptions
 import org.jetbrains.kotlin.gradle.plugin.KotlinTargetHierarchy
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 import java.util.*
 
 buildscript{
@@ -10,6 +11,7 @@ buildscript{
     dependencies{
         classpath("org.jetbrains.kotlinx:atomicfu-gradle-plugin:0.22.0")
     }
+
 }
 apply(plugin = "kotlinx-atomicfu")
 
@@ -39,7 +41,6 @@ val processBinaries = tasks.register("processBinaries", Copy::class) {
 tasks.withType<ProcessResources>{
     dependsOn(processBinaries)
 }
-
 
 // Stub secrets to let the project sync and build without the publication values set up
 ext["githubUsername"] = null
@@ -99,6 +100,7 @@ publishing{
 }
 
 
+
 private enum class PlatformType {
     APPLE,
     ANDROID
@@ -135,10 +137,14 @@ kotlin {
     jvm{
         compilations.all{
             kotlinOptions.jvmTarget = "1.8"
+            this.kotlinOptions {
+                freeCompilerArgs += listOf("-Xdebug")
+            }
         }
         testRuns["test"].executionTask.configure{
             useJUnitPlatform()
         }
+
     }
 
     macosX64{
@@ -196,10 +202,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:atomicfu:0.22.0")
             }
             dependsOn(commonMain)
-        }
-
-        val androidUnitTest by getting {
-            dependsOn(commonTest)
         }
 
         val jvmMain by getting {

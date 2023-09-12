@@ -76,6 +76,16 @@ class Session(private var handle: AskarSession?, private val isTxn: Boolean) {
         }
     }
 
+    suspend fun removeAll(category: String, tagFilter: String? = null): Boolean {
+        assertHandle()
+        return try {
+            handle!!.removeAll(category, tagFilter)
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     suspend fun insertKey(
         name: String,
         key: Key,
@@ -106,9 +116,9 @@ class Session(private var handle: AskarSession?, private val isTxn: Boolean) {
         tagFilter: String? = null,
         limit: Long? = null,
         forUpdate: Boolean = false
-    ) {
+    ): List<AskarKeyEntry> {
         assertHandle()
-        handle!!.fetchAllKeys(algorithm?.name, thumbprint, tagFilter, limit, forUpdate)
+        return handle!!.fetchAllKeys(algorithm?.name?.lowercase(), thumbprint, tagFilter, limit, forUpdate)
     }
 
     suspend fun updateKey(
