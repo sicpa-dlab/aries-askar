@@ -82,8 +82,8 @@ class Key(private val localKey: AskarLocalKey) {
     }
 
     fun jwkSecret(): Jwk {
-        val jwkStr = localKey.toJwkSecret()
-        return Json.decodeFromString<Jwk>(jwkStr.toString())
+        val jwkStr = localKey.toJwkSecret().toUByteArray().toByteArray().decodeToString()
+        return Json.decodeFromString<Jwk>(jwkStr)
     }
 
     fun jwkThumbprint(): String {
@@ -101,7 +101,7 @@ class Key(private val localKey: AskarLocalKey) {
     fun aeadEncrypt(
         message: String,
         nonce: ByteArray = ByteArray(0),
-        aad: String = ""
+        aad: String
     ): EncryptedBuffer {
         val messageList = message.map {
             it.code.toUByte()
@@ -140,8 +140,8 @@ class Key(private val localKey: AskarLocalKey) {
     ): ByteArray {
         return localKey.aeadDecrypt(
             cipherText.toUbyteList(),
-            nonce.toUbyteList(),
             tag.toUbyteList(),
+            nonce.toUbyteList(),
             aad.toUbyteList()
         ).toUByteArray().toByteArray()
     }

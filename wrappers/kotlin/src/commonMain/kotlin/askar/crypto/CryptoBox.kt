@@ -14,55 +14,55 @@ class CryptoBox {
             return temp.toUByteArray().toByteArray()
         }
 
-        fun cryptoBox(recipientKey: AskarLocalKey, senderKey: AskarLocalKey, message: String, nonce: ByteArray): ByteArray {
+        fun cryptoBox(recipientKey: Key, senderKey: Key, message: String, nonce: ByteArray): ByteArray {
             val messageList = message.map{
                 it.code.toUByte()
             }
             val nonceList = nonce.map{
                 it.toUByte()
             }
-            return crypto.cryptoBox(recipientKey, senderKey, messageList, nonceList).toUByteArray().toByteArray()
+            return crypto.cryptoBox(recipientKey.handle(), senderKey.handle(), messageList, nonceList).toUByteArray().toByteArray()
         }
 
-        fun cryptoBox(recipientKey: AskarLocalKey, senderKey: AskarLocalKey, message: ByteArray, nonce: ByteArray): ByteArray {
+        fun cryptoBox(recipientKey: Key, senderKey: Key, message: ByteArray, nonce: ByteArray): ByteArray {
             val messageList = message.map{
                 it.toUByte()
             }
             val nonceList = nonce.map{
                 it.toUByte()
             }
-            return crypto.cryptoBox(recipientKey, senderKey, messageList, nonceList).toUByteArray().toByteArray()
+            return crypto.cryptoBox(recipientKey.handle(), senderKey.handle(), messageList, nonceList).toUByteArray().toByteArray()
         }
 
-        fun open(recipientKey: AskarLocalKey, senderKey: AskarLocalKey, message: ByteArray, nonce: ByteArray): ByteArray {
+        fun open(recipientKey: Key, senderKey: Key, message: ByteArray, nonce: ByteArray): ByteArray {
             val messageList = message.map{
                 it.toUByte()
             }
             val nonceList = nonce.map{
                 it.toUByte()
             }
-            return crypto.boxOpen(recipientKey, senderKey, messageList, nonceList).toUByteArray().toByteArray()
+            return crypto.boxOpen(recipientKey.handle(), senderKey.handle(), messageList, nonceList).toUByteArray().toByteArray()
         }
 
-        fun seal(recipientKey: AskarLocalKey, message: ByteArray): ByteArray {
+        fun seal(recipientKey: Key, message: ByteArray): ByteArray {
             val messageList = message.map   {
                 it.toUByte()
             }
-            return crypto.boxSeal(recipientKey, messageList).toUByteArray().toByteArray()
+            return crypto.boxSeal(recipientKey.handle(), messageList).toUByteArray().toByteArray()
         }
 
-        fun seal(recipientKey: AskarLocalKey, message: String): ByteArray {
+        fun seal(recipientKey: Key, message: String): ByteArray {
             val messageList = message.map   {
                 it.code.toUByte()
             }
-            return crypto.boxSeal(recipientKey, messageList).toUByteArray().toByteArray()
+            return crypto.boxSeal(recipientKey.handle(), messageList).toUByteArray().toByteArray()
         }
 
-        fun sealOpen(recipientKey: AskarLocalKey, cipherText: ByteArray): ByteArray {
+        fun sealOpen(recipientKey: Key, cipherText: ByteArray): ByteArray {
             val cipherList = cipherText.map {
                 it.toUByte()
             }
-            return crypto.boxSealOpen(recipientKey, cipherList).toUByteArray().toByteArray()
+            return crypto.boxSealOpen(recipientKey.handle(), cipherList).toUByteArray().toByteArray()
         }
 
 

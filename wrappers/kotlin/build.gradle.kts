@@ -137,9 +137,9 @@ kotlin {
     jvm{
         compilations.all{
             kotlinOptions.jvmTarget = "1.8"
-            this.kotlinOptions {
-                freeCompilerArgs += listOf("-Xdebug")
-            }
+//            this.kotlinOptions {
+//                freeCompilerArgs += listOf("-Xdebug")
+//            }
         }
         testRuns["test"].executionTask.configure{
             useJUnitPlatform()
