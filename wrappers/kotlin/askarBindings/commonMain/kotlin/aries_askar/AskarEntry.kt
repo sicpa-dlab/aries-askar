@@ -49,6 +49,8 @@ class AskarEntry(
                 UniFFILib.uniffi_aries_askar_fn_method_askarentry_tags(it, _status)
             }
         }.let {
+            for( i in 0 until it.dataSize) {
+            }
             FfiConverterMapStringString.lift(it)
         }
 

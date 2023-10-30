@@ -7,7 +7,7 @@ import askar.store.Store
 import askar.toUbyteList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import kotlin.test.*
 import kotlin.test.Test
 
@@ -242,7 +242,9 @@ class AskarTest {
                 tags = Json.encodeToString(firstEntry.tags)
             )
 
-            assertEquals(1, txn.count(firstEntry.category, Json.encodeToString(firstEntry.tags)))
+            val count = txn.count(firstEntry.category, Json.encodeToString(firstEntry.tags))
+
+            assertEquals(1, count)
 
             val ret = txn.fetch(firstEntry.category, firstEntry.name) ?: throw Error("should not happen")
 
