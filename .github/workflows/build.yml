@@ -10,9 +10,11 @@ concurrency:
 
 on:
   push:
-    branches: [main]
+    branches:
+      - '**'
   pull_request:
-    branches: [main]
+    branches:
+      - '**'
   release:
     types: [created]
   workflow_dispatch:
@@ -47,7 +49,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: clippy, rustfmt
@@ -83,7 +85,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
@@ -114,94 +116,94 @@ jobs:
       - name: Test askar-crypto no default features
         run: cargo test --manifest-path ./askar-crypto/Cargo.toml --no-default-features
 
-  build-release:
-    name: Build library
-    needs: [checks]
-
-    strategy:
-      matrix:
-        include:
-          - architecture: linux-aarch64
-            os: ubuntu-latest
-            lib: libaries_askar.so
-            target: aarch64-unknown-linux-gnu
-            use_cross: true
-          - architecture: linux-x86_64
-            os: ubuntu-latest
-            lib: libaries_askar.so
-            target: x86_64-unknown-linux-gnu
-            use_cross: true
-          - architecture: darwin-universal
-            os: macos-latest
-            lib: libaries_askar.dylib
-            target: darwin-universal
-            # beta or nightly required for aarch64-apple-darwin target
-            toolchain: beta
-          - architecture: windows-x86_64
-            os: windows-latest
-            lib: aries_askar.dll
-            target: x86_64-pc-windows-msvc
-
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain || env.RUST_VERSION }}
-
-      - name: Cache cargo resources
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: deps
-          save-if: false
-
-      - name: Build
-        shell: sh
-        run: |
-          if [ -n "${{ matrix.use_cross }}" ]; then
-            cargo install --bins --git https://github.com/rust-embedded/cross --tag v${{ env.CROSS_VERSION }} cross
-            cross build --lib --release --target ${{ matrix.target }}
-          elif [ "${{ matrix.architecture }}" == "darwin-universal" ]; then
-            ./build-universal.sh
-          else
-            cargo build --lib --release --target ${{ matrix.target }}
-          fi
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: library-${{ matrix.architecture }}
-          path: target/${{ matrix.target }}/release/${{ matrix.lib }}
-
-      - name: Create artifacts directory
-        if: |
-          github.event_name == 'release' ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish-binaries == 'true')
-        run: |
-          mkdir release-artifacts
-          cp target/${{ matrix.target }}/release/${{ matrix.lib }} release-artifacts/
-
-      - uses: a7ul/tar-action@v1.1.2
-        if: |
-          github.event_name == 'release' ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish-binaries == 'true')
-        with:
-          command: c
-          cwd: release-artifacts
-          files: .
-          outPath: "library-${{ matrix.architecture }}.tar.gz"
-
-      - name: Add artifacts to release
-        if: |
-          github.event_name == 'release' ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish-binaries == 'true')
-        uses: svenstaro/upload-release-action@v2
-        with:
-          file: library-${{ matrix.architecture }}.tar.gz
-          asset_name: "library-${{ matrix.architecture }}.tar.gz"
+#  build-release:
+#    name: Build library
+#    needs: [checks]
+#
+#    strategy:
+#      matrix:
+#        include:
+#          - architecture: linux-aarch64
+#            os: ubuntu-latest
+#            lib: libaries_askar.so
+#            target: aarch64-unknown-linux-gnu
+#            use_cross: true
+#          - architecture: linux-x86_64
+#            os: ubuntu-latest
+#            lib: libaries_askar.so
+#            target: x86_64-unknown-linux-gnu
+#            use_cross: true
+#          - architecture: darwin-universal
+#            os: macos-latest
+#            lib: libaries_askar.dylib
+#            target: darwin-universal
+#            # beta or nightly required for aarch64-apple-darwin target
+#            toolchain: beta
+#          - architecture: windows-x86_64
+#            os: windows-latest
+#            lib: aries_askar.dll
+#            target: x86_64-pc-windows-msvc
+#
+#    runs-on: ${{ matrix.os }}
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#
+#      - name: Install Rust toolchain
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          toolchain: ${{ matrix.toolchain || env.RUST_VERSION }}
+#
+#      - name: Cache cargo resources
+#        uses: Swatinem/rust-cache@v2
+#        with:
+#          shared-key: deps
+#          save-if: false
+#
+#      - name: Build
+#        shell: sh
+#        run: |
+#          if [ -n "${{ matrix.use_cross }}" ]; then
+#            cargo install --bins --git https://github.com/rust-embedded/cross --tag v${{ env.CROSS_VERSION }} cross
+#            cross build --lib --release --target ${{ matrix.target }}
+#          elif [ "${{ matrix.architecture }}" == "darwin-universal" ]; then
+#            ./build-universal.sh
+#          else
+#            cargo build --lib --release --target ${{ matrix.target }}
+#          fi
+#
+#      - name: Upload artifacts
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: library-${{ matrix.architecture }}
+#          path: target/${{ matrix.target }}/release/${{ matrix.lib }}
+#
+#      - name: Create artifacts directory
+#        if: |
+#          github.event_name == 'release' ||
+#          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish-binaries == 'true')
+#        run: |
+#          mkdir release-artifacts
+#          cp target/${{ matrix.target }}/release/${{ matrix.lib }} release-artifacts/
+#
+#      - uses: a7ul/tar-action@v1.1.2
+#        if: |
+#          github.event_name == 'release' ||
+#          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish-binaries == 'true')
+#        with:
+#          command: c
+#          cwd: release-artifacts
+#          files: .
+#          outPath: "library-${{ matrix.architecture }}.tar.gz"
+#
+#      - name: Add artifacts to release
+#        if: |
+#          github.event_name == 'release' ||
+#          (github.event_name == 'workflow_dispatch' && github.event.inputs.publish-binaries == 'true')
+#        uses: svenstaro/upload-release-action@v2
+#        with:
+#          file: library-${{ matrix.architecture }}.tar.gz
+#          asset_name: "library-${{ matrix.architecture }}.tar.gz"
 
   build-py:
     name: Build and test Python wrapper
@@ -375,7 +377,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: ${{ matrix.target }}
@@ -389,6 +391,30 @@ jobs:
         with:
           name: library-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/libaries_askar.a
+
+  build-jvm:
+    name: Build library (JVM)
+    needs: [checks]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+  
+      - name: Cache cargo resources
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: deps
+          save-if: false
+      
+      - name: Publish jvm kotlin
+        working-directory: wrappers/kotlin
+        run: ./gradlew publishAllPublicationsToGithubRepository
 
   build-android:
     name: Build library (Android)
@@ -412,7 +438,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.RUST_VERSION }}
 
@@ -433,37 +459,37 @@ jobs:
           name: library-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/libaries_askar.so
 
-  create-ios-xcframework:
-    name: Create iOS xcframework
-    runs-on: macos-latest
-    needs: [build-ios]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Fetch static libraries
-        uses: actions/download-artifact@v3
-
-      - run: >
-          ./build-xcframework.sh library-aarch64-apple-ios \
-                                 library-aarch64-apple-ios-sim \
-                                 library-x86_64-apple-ios \
-                                 include
-
-      - name: Save xcframework
-        uses: actions/upload-artifact@v3
-        with:
-          name: aries_askar.xcframework
-          path: ./out
-
-      - uses: geekyeggo/delete-artifact@v2
-        with:
-          name: |
-            library-aarch64-apple-ios
-            library-aarch64-apple-ios-sim
-            library-x86_64-apple-ios
-          failOnError: false
+#  create-ios-xcframework:
+#    name: Create iOS xcframework
+#    runs-on: macos-latest
+#    needs: [build-ios]
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#
+#      - name: Fetch static libraries
+#        uses: actions/download-artifact@v3
+#
+#      - run: >
+#          ./build-xcframework.sh library-aarch64-apple-ios \
+#                                 library-aarch64-apple-ios-sim \
+#                                 library-x86_64-apple-ios \
+#                                 include
+#
+#      - name: Save xcframework
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: aries_askar.xcframework
+#          path: ./out
+#
+#      - uses: geekyeggo/delete-artifact@v2
+#        with:
+#          name: |
+#            library-aarch64-apple-ios
+#            library-aarch64-apple-ios-sim
+#            library-x86_64-apple-ios
+#          failOnError: false
 
   create-android-library:
     name: Create library (Android)
