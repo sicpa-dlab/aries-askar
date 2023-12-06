@@ -76,9 +76,15 @@ def _struct_dtor(ctype: type, address: int, dtor: Callable):
 
 
 def finalize_struct(instance, ctype):
+    """Attach a struct destructor."""
     finalize(
         instance, _struct_dtor, ctype, addressof(instance), instance.__class__._cleanup
     )
+
+
+def keepalive(instance, *depend):
+    """Ensure that dependencies are kept alive as long as the instance."""
+    finalize(instance, lambda *_args: None, *depend)
 
 
 class LibLoad:
@@ -199,14 +205,20 @@ class LibLoad:
     def invoke(self, name, argtypes, *args):
         """Perform a synchronous library function call."""
         method = self.method(name, argtypes, restype=c_int64)
+        if not method:
+            raise ValueError(f"FFI method not found: {name}")
         args = _load_method_arguments(name, argtypes, args)
         result = method(*args)
         if result:
             raise self.get_current_error(True)
 
-    def invoke_async(self, name: str, argtypes, *args, return_type=None):
+    def invoke_async(
+        self, name: str, argtypes, *args, return_type=None
+    ) -> asyncio.Future:
         """Perform an asynchronous library function call."""
         method = self.method(name, (*argtypes, c_void_p, c_int64), restype=c_int64)
+        if not method:
+            raise ValueError(f"FFI method not found: {name}")
         loop = asyncio.get_event_loop()
         fut = loop.create_future()
         cb_info = self._cfuncs.get(name)
@@ -310,6 +322,8 @@ class LibLoad:
                     self._lib_name,
                 )
 
+        self.method("askar_terminate", None, restype=None)()
+
 
 class Lib:
     """The loaded library instance."""
@@ -362,7 +376,7 @@ class Lib:
     def version(self) -> str:
         """Get the version of the installed library."""
         return str(
-            self.loaded._method(
+            self.loaded.method(
                 "askar_version",
                 None,
                 restype=StrBuffer,
@@ -396,7 +410,7 @@ class RawBuffer(Structure):
         return bytes(self.array)
 
     def __len__(self) -> int:
-        return int(self.len)
+        return self.len.value
 
     @property
     def array(self) -> Array:
@@ -454,7 +468,6 @@ class ByteBuffer(Structure):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._a = addressof(self)
         finalize_struct(self, RawBuffer)
 
     @property
@@ -468,8 +481,7 @@ class ByteBuffer(Structure):
     @property
     def view(self) -> memoryview:
         m = memoryview(self.array)
-        # ensure self stays alive until the view is dropped
-        finalize(m, lambda _: (), self)
+        keepalive(m, self)
         return m
 
     def __bytes__(self) -> bytes:
